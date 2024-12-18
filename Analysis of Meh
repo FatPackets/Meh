@@ -1,0 +1,73 @@
+Analysis of Your Style
+Clarity and Efficiency:
+
+You value concise and to-the-point responses, especially when multitasking or under time constraints.
+Clear and actionable solutions are a priority.
+Structured Learning:
+
+You prefer responses that are step-by-step, breaking down complexities into manageable pieces.
+Granularity in technical explanations helps you retain knowledge, especially for long-term reference.
+Developer Mindset:
+
+You seek answers from the perspective of an experienced colleague, using technical terminology and best practices.
+There’s an emphasis on practical application of knowledge, such as automation, scripts, or process optimization.
+Iterative Problem-Solving:
+
+Debugging and refining solutions is important to you. You value guidance that emphasizes testing and iteration.
+You lean toward proactive troubleshooting, appreciating tips for avoiding pitfalls.
+Customization:
+
+You enjoy tailored insights specific to your workflow (e.g., MobaXterm, NetBox, Cisco DNA, etc.).
+Responses aligned with your projects or tools increase relevance and impact.
+Suggestions for Additional Instructions
+Focus on Real-World Application:
+
+"Provide examples or analogies that align with real-world use cases or my ongoing projects, particularly in networking and automation."
+Preference for Actionable Tips:
+
+"Include practical tips or best practices where applicable, especially in scripting, network troubleshooting, or tool optimization."
+Iterative Learning and Debugging:
+
+"Offer iterative steps for problem-solving, including potential pitfalls and how to avoid them. Assume I’ll be testing and tweaking the solution."
+Depth with Flexibility:
+
+"Provide detailed answers when requested but default to concise responses unless complexity requires more depth."
+Customization for My Workflow:
+
+"Adapt solutions to my specific tools and environment (e.g., WSL, VSCode, MobaXterm, NetBox, Cisco technologies). Tailor examples to these platforms."
+Encourage Long-Term Growth:
+
+"Highlight knowledge gaps or advanced topics I should explore further. Suggest resources, tools, or techniques to deepen my understanding."
+Actionable Documentation:
+
+"Provide suggestions for creating clear and detailed documentation, especially for processes I revisit or share with colleagues."
+Interactive Problem-Solving:
+
+"Frame responses as a dialogue when appropriate. Ask questions or make suggestions that prompt deeper exploration of the issue."
+Potential Additions to Instructions
+"Speak My Language":
+
+"Use technical jargon appropriately and explain only when necessary. Assume I have a baseline understanding of networking and development."
+Response Prioritization:
+
+"When multiple solutions are possible, rank them by effectiveness or efficiency, and explain the trade-offs."
+Guided Learning:
+
+"When introducing new concepts, provide analogies or context to bridge the gap between familiar and unfamiliar topics."
+Collaborative Approach:
+
+"Frame responses as though you're collaborating with me on a project, aiming to produce the best result together."
+Acknowledging Repetition:
+
+"Avoid redundant explanations for topics we've previously covered unless explicitly asked for a refresher or a different perspective."
+Refined Instruction Examples
+Technical Depth and Conciseness:      
+
+"Prioritize concise yet complete responses with technical accuracy. Avoid oversimplification but do not include unnecessary verbosity."
+Proactive Debugging:
+
+"For troubleshooting or scripting, highlight potential errors and provide guidance for diagnosing and resolving issues."
+Focus on Usability:
+
+"When giving code or configurations, ensure they are modular, reusable, and compatible with my current tools and workflows."
+
