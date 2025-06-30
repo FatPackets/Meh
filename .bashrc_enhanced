@@ -1,0 +1,465 @@
+# ~/.bashrc: Streamlined and Enhanced Configuration for WSL Ubuntu
+
+# Exit if not running interactively
+[[ $- != *i* ]] && return
+
+#==========================================
+# SHELL CONFIGURATION
+#==========================================
+
+# --- Shell Options ---
+# Auto-append to history, check window size changes, enable extended globbing
+shopt -s histappend checkwinsize globstar 2>/dev/null
+# Prevent overwriting files with redirection
+set -o noclobber
+
+# --- History Settings ---
+HISTCONTROL=ignoreboth:erasedups  # Ignore duplicates and commands starting with space
+HISTSIZE=10000                   # Number of commands to keep in history (in memory)
+HISTFILESIZE=20000               # Number of commands to keep in history file
+HISTTIMEFORMAT="%F %T "          # Add timestamps to history
+
+# --- Tab Completion Improvements ---
+bind "set completion-ignore-case on"   # Ignore case for completion
+bind "set completion-map-case on"      # Treat hyphens and underscores as equivalent
+bind "set show-all-if-ambiguous on"    # Show all possible completions if ambiguous
+bind '"\e[A": history-search-backward' # Arrow up for history search
+bind '"\e[B": history-search-forward'  # Arrow down for history search
+
+# --- Bash Completion ---
+# Source global bash completion scripts if not in POSIX mode
+if ! shopt -oq posix; then
+    if [[ -f /usr/share/bash-completion/bash_completion ]]; then
+        # shellcheck source=/dev/null
+        . /usr/share/bash-completion/bash_completion
+    elif [[ -f /etc/bash_completion ]]; then
+        # shellcheck source=/dev/null
+        . /etc/bash_completion
+    fi
+fi
+
+#==========================================
+# COLORS & APPEARANCE
+#==========================================
+
+# --- Dircolors and LS_COLORS ---
+if [[ -x /usr/bin/dircolors ]]; then
+    if [[ -r ~/.dircolors ]]; then
+        eval "$(dircolors -b ~/.dircolors)"
+    else
+        eval "$(dircolors -b)"
+    fi
+
+    # --- Colored Aliases (basic) ---
+    alias ls='ls --color=auto -hF'
+    alias grep='grep --color=auto'
+    alias fgrep='fgrep --color=auto'
+    alias egrep='egrep --color=auto'
+    alias diff='diff --color=auto'
+    alias ip='ip -color=auto'
+fi
+
+# --- Enhanced cat/less with bat (if available) ---
+if command -v bat >/dev/null 2>&1; then
+    alias cat='bat --style=plain --paging=never'
+    alias less='bat'
+fi
+
+# --- GCC Colors ---
+export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01'
+
+# --- Colored Man Pages ---
+export LESS="-R" # Use raw control characters for colors in less
+if [[ -x /usr/bin/lesspipe ]]; then
+    # shellcheck source=/dev/null
+    eval "$(SHELL=/bin/sh lesspipe)" # Enable lesspipe for richer man page content
+fi
+export LESS_TERMCAP_mb=$'\E[1;38;5;208m'  # Start blinking text (orange)
+export LESS_TERMCAP_md=$'\E[1;38;5;45m'   # Start bold text (blue)
+export LESS_TERMCAP_me=$'\E[0m'           # End all mode like so, us, mb, md, mr
+export LESS_TERMCAP_se=$'\E[0m'           # End standout mode
+export LESS_TERMCAP_so=$'\E[1;38;5;234;48;5;220m]' # Start standout mode (dark grey fg, yellow bg)
+export LESS_TERMCAP_ue=$'\E[0m'           # End underline
+export LESS_TERMCAP_us=$'\E[4;38;5;118m]'  # Start underline (green)
+
+#==========================================
+# PROMPT CONFIGURATION
+#==========================================
+
+# --- Color Definitions for Prompt ---
+_CLR_RESET="\[\033[0m\]"
+_CLR_USER="\[\033[01;38;2;195;232;141m\]" # Light Green
+_CLR_HOST="\[\033[01;38;2;255;203;107m\]" # Light Yellow
+_CLR_PATH="\[\033[01;38;2;106;196;255m\]" # Light Blue
+# _CLR_GIT="\[\033[01;38;2;199;146;234m\]"  # Light Purple (Used by git-prompt if GIT_PS1_SHOWCOLORHINTS is set)
+_CLR_ERR="\[\033[01;38;2;255;85;85m\]"    # Light Red
+
+# --- Debian chroot ---
+_debian_chroot=""
+if [[ -r /etc/debian_chroot ]]; then
+    _debian_chroot=$(cat /etc/debian_chroot)
+fi
+
+# --- Git Prompt Setup ---
+# Attempt to find and source git-prompt.sh
+_git_prompt_locations=(
+    "/usr/lib/git-core/git-sh-prompt"
+    "/usr/local/lib/git-core/git-sh-prompt" # Another common location
+    "/etc/bash_completion.d/git-prompt"
+    "$HOME/.config/git/git-prompt.sh" # User-specific modern location
+    "$HOME/.git-prompt.sh"            # User-specific legacy location
+)
+
+_git_prompt_sourced=0
+for _git_prompt_file in "${_git_prompt_locations[@]}"; do
+    if [[ -f "$_git_prompt_file" ]]; then
+        # shellcheck source=/dev/null
+        source "$_git_prompt_file"
+        _git_prompt_sourced=1
+        break
+    fi
+done
+
+if [[ "$_git_prompt_sourced" -eq 1 ]]; then
+    export GIT_PS1_SHOWDIRTYSTATE=1       # Show 'dirty' state (uncommitted changes)
+    export GIT_PS1_SHOWUNTRACKEDFILES=1   # Show untracked files
+    export GIT_PS1_SHOWUPSTREAM="auto"    # Show upstream status (ahead, behind, diverged)
+    export GIT_PS1_SHOWCOLORHINTS=1       # Enable color hints for git status (uses its own colors)
+
+    # Define prompt using __git_ps1
+    _PRIMARY_PS1_CONTENT='${_debian_chroot:+($_debian_chroot)}${_CLR_USER}\u${_CLR_RESET}@${_CLR_HOST}\h${_CLR_RESET}:${_CLR_PATH}\w${_CLR_RESET}'
+    _SECONDARY_PS1_CONTENT='\n\$([[ \$? == 0 ]] && echo \"${_CLR_RESET}\" || echo \"${_CLR_ERR}\")\$ ${_CLR_RESET}'
+    # PROMPT_COMMAND is set further down to incorporate other dynamic elements
+else
+    # --- Fallback Prompt (if git prompt is not available) ---
+    PS1="${_debian_chroot:+($_debian_chroot)}${_CLR_USER}\u${_CLR_RESET}@${_CLR_HOST}\h${_CLR_RESET}:${_CLR_PATH}\w${_CLR_RESET}\n\$([[ \$? == 0 ]] && echo \"${_CLR_RESET}\" || echo \"${_CLR_ERR}\")\\$ ${_CLR_RESET}"
+fi
+
+
+# --- Python Virtualenv in Prompt ---
+_update_venv_in_prompt() {
+    if [[ -n "$VIRTUAL_ENV" ]]; then
+        local venv_name
+        venv_name=$(basename "$VIRTUAL_ENV")
+        # Using a more distinct color for venv
+        _PS1_VENV_PREPEND="\[\033[01;38;5;141m\](venv:$venv_name)${_CLR_RESET} "
+    else
+        _PS1_VENV_PREPEND=""
+    fi
+}
+
+# --- Kubernetes Context in Prompt (Example - requires kubectl) ---
+_update_kube_context_in_prompt() {
+    if command -v kubectl >/dev/null 2>&1; then
+        local kube_context
+        kube_context=$(kubectl config current-context 2>/dev/null)
+        if [[ -n "$kube_context" ]]; then
+                                # Using a distinct color for k8s context
+            _PS1_KUBE_PREPEND="\[\033[01;38;5;39m\](k8s:$kube_context)${_CLR_RESET} "
+        else
+            _PS1_KUBE_PREPEND=""
+        fi
+    else
+        _PS1_KUBE_PREPEND=""
+    fi
+}
+
+
+# --- Combined PROMPT_COMMAND ---
+_build_prompt() {
+    local exit_status=$? # Capture exit status immediately
+
+    _update_venv_in_prompt      # Update VENV info
+    _update_kube_context_in_prompt # Update Kube info (example)
+
+    local current_ps1=""
+    current_ps1+="$_PS1_VENV_PREPEND"
+    current_ps1+="$_PS1_KUBE_PREPEND" # Add other prepends here
+
+    if [[ "$_git_prompt_sourced" -eq 1 ]]; then
+        # Call __git_ps1 with the primary content, it will handle its own coloring for git part
+        current_ps1+=$(__git_ps1 "$_PRIMARY_PS1_CONTENT" "$_SECONDARY_PS1_CONTENT" " (%s)")
+    else
+        # Fallback if git prompt wasn't sourced
+        current_ps1+="${_debian_chroot:+($_debian_chroot)}${_CLR_USER}\u${_CLR_RESET}@${_CLR_HOST}\h${_CLR_RESET}:${_CLR_PATH}\w${_CLR_RESET}"
+        current_ps1+="\n\$([[ $exit_status == 0 ]] && echo \"${_CLR_RESET}\" || echo \"${_CLR_ERR}\")\\$ ${_CLR_RESET}"
+    fi
+    PS1="$current_ps1"
+}
+
+# Set PROMPT_COMMAND to build the prompt and set the terminal title
+PROMPT_COMMAND="_build_prompt"
+
+# --- Terminal Window Title ---
+# Needs to be part of PROMPT_COMMAND to update dynamically
+_set_terminal_title() {
+    case "$TERM" in
+        xterm*|rxvt*|screen*|tmux*)
+            echo -ne "\033]0;\${USER}@\${HOSTNAME}: \${PWD/#\$HOME/\~}\007"
+            ;;
+    esac
+}
+PROMPT_COMMAND="${PROMPT_COMMAND}; _set_terminal_title"
+
+
+#==========================================
+# ALIASES & FUNCTIONS
+#==========================================
+
+# --- Source External Aliases ---
+# Check if .bash_aliases exists and source it, create if not.
+if [[ ! -f ~/.bash_aliases ]]; then
+    echo "# ~/.bash_aliases: Put your custom aliases here" > ~/.bash_aliases
+    echo "# Example: alias update='sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y'" >> ~/.bash_aliases
+    echo "# Example: alias glog=\"git log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit\"" >> ~/.bash_aliases
+    echo "Created ~/.bash_aliases. Please add your custom aliases there."
+fi
+# shellcheck source=/dev/null
+. ~/.bash_aliases
+
+
+# --- Navigation Aliases ---
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias .....='cd ../../../..' # Added one more level
+alias cd..='cd ..' # Common typo
+
+# --- Common Command Aliases ---
+alias ll='ls -la'    # List all files in long format, including hidden
+alias la='ls -A'     # List all files, including hidden, but not . and ..
+alias l='ls -CF'     # List files in columns, sorted vertically, with type indicators
+alias h='history'
+alias c='clear'
+alias cls='clear'    # For Windows habits
+
+# --- Safety Aliases (interactive confirmation) ---
+alias rm='rm -i'
+alias cp='cp -i'
+alias mv='mv -i'
+alias mkdir='mkdir -p' # Create parent directories if they don't exist
+
+# --- System Information Aliases ---
+alias df='df -hT'            # Disk free, human-readable, show type
+alias du='du -sh'            # Disk usage, human-readable, summary for current dir
+alias free='free -h'         # Free memory, human-readable
+alias top='command -v htop >/dev/null 2>&1 && htop || top' # Prefer htop if available
+alias path='echo -e ${PATH//:/\\n}' # Print PATH entries, one per line
+alias ports='sudo netstat -tulnp' # Show open ports (requires net-tools)
+alias myip="dig +short myip.opendns.com @resolver1.opendns.com" # Get public IP
+
+alias mac='~/dev_fproot/F5/mac_format.sh' # User-specific alias, kept as requested
+
+# --- Utility Functions ---
+
+# Create a directory and change into it
+mkcd() {
+    if [[ -z "$1" ]]; then
+        echo "Usage: mkcd <directory_name>" >&2
+        return 1
+    fi
+    # Check if directory already exists to avoid error message from mkdir -p
+    if [[ -d "$1" ]]; then
+        if ! cd "$1"; then
+             echo "Error: Could not cd into existing directory '$1'." >&2
+             return 1
+        fi
+    else
+        if ! mkdir -p "$1"; then
+            echo "Error: Could not create directory '$1'." >&2
+            return 1
+        fi
+        if ! cd "$1"; then
+            echo "Error: Could not cd into newly created directory '$1'." >&2
+            # Attempt to clean up if cd fails after mkdir
+            # This part is optional and depends on desired behavior
+            # local created_dir_path
+            # created_dir_path=$(realpath "$1" 2>/dev/null) # Get absolute path
+            # if [[ -n "$created_dir_path" ]] && [[ "$created_dir_path" != "/" ]]; then
+            #     rmdir "$created_dir_path" 2>/dev/null || echo "Warning: Could not remove partially created directory '$1'." >&2
+            # fi
+            return 1
+        fi
+    fi
+    echo "Current directory: $(pwd)"
+}
+
+# Extract various archive types
+# Checks for required tools before attempting extraction.
+extract() {
+    local filename="$1"
+    local tool_missing=0
+    local required_tool=""
+
+    if [[ -z "$filename" ]]; then
+        echo "Usage: extract <archive_file>" >&2
+        return 1
+    fi
+    if [[ ! -f "$filename" ]]; then
+        echo "Error: '$filename' is not a valid file." >&2
+        return 1
+    fi
+
+    case "$filename" in
+        *.tar.bz2|*.tbz2) required_tool="tar"; tar xjf "$filename" ;;
+        *.tar.gz|*.tgz)   required_tool="tar"; tar xzf "$filename" ;;
+        *.bz2)            required_tool="bunzip2"; bunzip2 "$filename" ;;
+        *.rar)            required_tool="unrar"; unrar x "$filename" ;;
+        *.gz)             required_tool="gunzip"; gunzip "$filename"  ;;
+        *.tar)            required_tool="tar"; tar xf "$filename"  ;;
+        *.zip)            required_tool="unzip"; unzip "$filename"   ;;
+        *.Z)              required_tool="uncompress"; uncompress "$filename" ;;
+        *.7z)             required_tool="7z"; 7z x "$filename"    ;;
+        *)
+            echo "Error: Don't know how to extract '$filename'." >&2
+            return 1
+            ;;
+    esac
+
+    if ! command -v "$required_tool" >/dev/null 2>&1; then
+        echo "Error: Required tool '$required_tool' for '$filename' is not installed." >&2
+        return 1
+    fi
+
+    if [[ $? -eq 0 ]]; then
+        echo "'$filename' extracted successfully."
+    else
+        echo "Error extracting '$filename'." >&2
+        return 1
+    fi
+}
+
+# Check if a port is open on a host
+is_port_open() {
+    if [[ -z "$1" ]] || [[ -z "$2" ]]; then
+        echo "Usage: is_port_open <host> <port>" >&2
+        return 1
+    fi
+    if ! command -v nc >/dev/null 2>&1; then
+        echo "Error: 'nc' (netcat) command not found. Please install it (e.g., sudo apt install netcat-openbsd or netcat-traditional)." >&2
+        return 1
+    fi
+    # -z: zero-I/O mode (scanning)
+    # -v: verbose (optional, remove for quiet check)
+    # -w1: timeout of 1 second
+    if nc -zvw1 "$1" "$2" &>/dev/null; then
+        echo "Port $2 on $1 is OPEN."
+        return 0
+    else
+        echo "Port $2 on $1 is CLOSED."
+        return 1
+    fi
+}
+
+# Serve current directory over HTTP (requires Python)
+serve() {
+    local port="${1:-8000}"
+    if command -v python3 >/dev/null 2>&1; then
+        echo "Serving current directory ( $(pwd) ) on http://0.0.0.0:${port}"
+        python3 -m http.server "${port}"
+    elif command -v python >/dev/null 2>&1; then
+        echo "Serving current directory ( $(pwd) ) on http://0.0.0.0:${port}"
+        python -m SimpleHTTPServer "${port}"
+    else
+        echo "Error: Python not found. Cannot start HTTP server." >&2
+        return 1
+    fi
+}
+
+
+#==========================================
+# ENVIRONMENT & PATH CONFIGURATION
+#==========================================
+
+# --- Default Applications ---
+export EDITOR="nano" # Consider 'vim', 'nvim', or 'code --wait' if preferred
+export VISUAL="$EDITOR"
+export PAGER="less"
+
+# --- PATH Manipulation ---
+# Function to add a directory to PATH if it exists and isn't already there
+# Prepends to PATH
+_add_to_path_start_if_exists() {
+    local dir_to_add="$1"
+    if [[ -d "$dir_to_add" ]] && [[ ":$PATH:" != *":${dir_to_add}:"* ]]; then
+        PATH="$dir_to_add${PATH:+":$PATH"}" # Add to start, handle empty PATH
+    fi
+}
+
+# Appends to PATH
+_add_to_path_end_if_exists() {
+    local dir_to_add="$1"
+    if [[ -d "$dir_to_add" ]] && [[ ":$PATH:" != *":${dir_to_add}:"* ]]; then
+        PATH="${PATH:+"$PATH:"}$dir_to_add" # Add to end, handle empty PATH
+    fi
+}
+
+# Add user-specific bin directories (prefer adding to start for user overrides)
+_add_to_path_start_if_exists "$HOME/.local/bin"
+_add_to_path_start_if_exists "$HOME/bin"
+# Removed "$HOME/automation-tools" as per user feedback (unknown)
+
+# --- CDPATH Configuration (for smarter cd) ---
+# Directories to search when using 'cd' without a full path
+_CDPATH_SETUP="." # Current directory first
+if [[ -d "$HOME/dev_fproot" ]]; then # Kept as requested
+    _CDPATH_SETUP="$_CDPATH_SETUP:$HOME/dev_fproot"
+fi
+if [[ -d "$HOME" ]]; then
+    _CDPATH_SETUP="$_CDPATH_SETUP:$HOME"
+fi
+export CDPATH="$_CDPATH_SETUP"
+
+
+# --- Git Specific Bash Completion ---
+# This might be redundant if global bash-completion is already sourced and includes git.
+# However, it ensures git completion is explicitly sourced if available.
+if [[ -f /usr/share/bash-completion/completions/git ]]; then
+    # shellcheck source=/dev/null
+    source /usr/share/bash-completion/completions/git
+    # Enable completion for 'g' alias if you use one (e.g., alias g='git')
+    # declare -F __git_complete >/dev/null 2>&1 && __git_complete g __git_main
+fi
+
+# --- Homebrew (Linuxbrew) ---
+# Check for Homebrew and add it to the environment if found
+_configure_homebrew() {
+    local brew_executable
+    # Try finding brew in common locations or PATH
+    if [[ -x "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
+        brew_executable="/home/linuxbrew/.linuxbrew/bin/brew"
+    elif [[ -x "/opt/homebrew/bin/brew" ]]; then
+        brew_executable="/opt/homebrew/bin/brew"
+    elif command -v brew >/dev/null 2>&1; then
+        brew_executable=$(command -v brew)
+    fi
+
+    if [[ -n "$brew_executable" ]]; then
+        eval "$("$brew_executable" shellenv)"
+    fi
+}
+_configure_homebrew
+
+
+#==========================================
+# FINAL CLEANUP
+#==========================================
+# Unset temporary variables and functions used during setup
+# Prefixing temporary items with '_' makes them easier to identify and unset.
+unset _CLR_RESET _CLR_USER _CLR_HOST _CLR_PATH _CLR_GIT _CLR_ERR
+unset _git_prompt_locations _git_prompt_file _git_prompt_sourced _debian_chroot
+unset _PRIMARY_PS1_CONTENT _SECONDARY_PS1_CONTENT
+unset _CDPATH_SETUP _PS1_VENV_PREPEND _PS1_KUBE_PREPEND
+
+unset _update_venv_in_prompt _update_kube_context_in_prompt
+unset _build_prompt _set_terminal_title
+unset _add_to_path_start_if_exists _add_to_path_end_if_exists
+unset _configure_homebrew
+
+# --- END OF .bashrc ---
+# Consider adding custom scripts or configurations below this line if needed,
+# or preferably in ~/.bash_aliases or other sourced files like ~/.bash_profile or ~/.profile.
+# Example:
+# if [ -f ~/.my_custom_bash_script.sh ]; then
+#   . ~/.my_custom_bash_script.sh
+# fi
