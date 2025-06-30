@@ -1,0 +1,392 @@
+# ~/.bashrc: Next-Generation Configuration for WSL Ubuntu
+# Features: Modular, fzf, zoxide, exa, starship, vivid LS_COLORS, custom chill theme
+
+# Exit if not running interactively
+[[ $- != *i* ]] && return
+
+# --- Strict Mode (safer scripts) ---
+set -o pipefail # Exit status of a pipeline is that of the last command to fail
+# Consider 'set -u' (nounset) after ensuring all variables are handled
+# Consider 'set -e' (errexit) carefully or within specific functions
+
+#==========================================
+# MODULAR CONFIGURATION (~/.bashrc.d)
+#==========================================
+# Create the directory if it doesn't exist
+if [[ ! -d ~/.bashrc.d ]]; then
+    mkdir -p ~/.bashrc.d
+    echo "# This directory holds modular bash configurations." > ~/.bashrc.d/README.md
+    echo "# Files ending in .sh will be sourced by ~/.bashrc." >> ~/.bashrc.d/README.md
+    echo "# Use prefixes like 00-, 10-, 20- to control sourcing order." >> ~/.bashrc.d/README.md
+fi
+
+# Function to source files from .bashrc.d
+_source_bashrc_d_files() {
+    if [[ -d ~/.bashrc.d ]]; then
+        local file
+        for file in ~/.bashrc.d/*.sh; do
+            if [[ -r "$file" ]]; then
+                # shellcheck source=/dev/null
+                . "$file"
+            fi
+        done
+        unset file
+    fi
+}
+# Note: We will define core settings here first, then provide an example of how
+# to move them to .bashrc.d later if desired. For now, most logic remains in this main file.
+
+#==========================================
+# COLOR PALETTE ("Bearded Aquarelle Hydrangea" Inspired - Chill Vibes)
+#==========================================
+# Primary Colors
+export CLR_BG_MAIN="\[\033[38;2;40;42;54m\]" # Dark Grayish Blue (example, adjust to your terminal bg)
+export CLR_FG_MAIN="\[\033[38;2;200;200;210m\]" # Light Grayish/Off-white
+
+# Accent Colors
+export CLR_ACCENT_ORANGE="\[\033[38;2;255;150;80m\]"  # Vibrant Orange
+export CLR_ACCENT_GREEN="\[\033[38;2;130;200;130m\]"  # Soft Green
+export CLR_ACCENT_BLUE="\[\033[38;2;120;180;255m\]"   # Calm Blue
+export CLR_ACCENT_YELLOW="\[\033[38;2;255;210;100m\]" # Complementary Yellow
+export CLR_ACCENT_MAGENTA="\[\033[38;2;220;150;220m\]" # Soft Magenta
+export CLR_ACCENT_CYAN="\[\033[38;2;130;210;210m\]"   # Grayish Cyan/Teal
+
+# Semantic Colors
+export CLR_USER="${CLR_ACCENT_GREEN}"
+export CLR_HOST="${CLR_ACCENT_BLUE}"
+export CLR_PATH="${CLR_ACCENT_CYAN}"
+export CLR_GIT_BRANCH="${CLR_ACCENT_MAGENTA}" # Base for git, Starship/fzf might override
+export CLR_SUCCESS="${CLR_ACCENT_GREEN}"
+export CLR_ERROR="\[\033[38;2;255;100;100m\]" # Clear Red for errors
+export CLR_VENV="\[\033[38;2;255;170;100m\]" # Distinct Orange for venv
+export CLR_K8S="\[\033[38;2;100;170;255m\]"  # Distinct Blue for k8s
+
+export CLR_RESET="\[\033[0m\]"
+export CLR_BOLD="\[\033[1m\]"
+export CLR_DIM="\[\033[2m\]"
+export CLR_UNDERLINE="\[\033[4m\]"
+
+#==========================================
+# SHELL CONFIGURATION (Core)
+#==========================================
+# (Can be moved to ~/.bashrc.d/00-shell_options.sh)
+
+# --- Shell Options ---
+shopt -s histappend checkwinsize globstar autocd 2>/dev/null
+
+# --- History Settings ---
+HISTCONTROL=ignoreboth:erasedups
+HISTSIZE=20000
+HISTFILESIZE=40000
+HISTTIMEFORMAT="%F %T "
+# Log history immediately after command execution
+# PROMPT_COMMAND is managed carefully later, especially with Starship
+_bashrc_append_history() { history -a; }
+
+
+# --- Tab Completion Improvements ---
+bind "set completion-ignore-case on"
+bind "set completion-map-case on"
+bind "set show-all-if-ambiguous on"
+bind "set colored-stats on"
+bind "set colored-completion-prefix on"
+if command -v tput >/dev/null 2>&1; then # Check if tput is available
+    bind "set completion-display-width \$(tput cols)"
+fi
+
+# --- Bash Completion ---
+if ! shopt -oq posix; then
+    [[ -f /usr/share/bash-completion/bash_completion ]] && . /usr/share/bash-completion/bash_completion
+    [[ -f /etc/bash_completion ]] && . /etc/bash_completion
+    # For Homebrew on Linux
+    if command -v brew >/dev/null 2>&1 && [[ -f "$(brew --prefix)/etc/bash_completion" ]]; then
+        # shellcheck source=/dev/null
+        . "$(brew --prefix)/etc/bash_completion"
+    fi
+fi
+
+#==========================================
+# APPEARANCE & THEMEING
+#==========================================
+# (Can be moved to ~/.bashrc.d/05-appearance.sh)
+
+# --- Dircolors, LS_COLORS with Vivid ---
+export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01'
+
+if command -v vivid >/dev/null 2>&1; then
+    _VIVID_THEME="catppuccin-macchiato" # A good "chill" theme
+    # Check if theme exists locally first, otherwise vivid might try to download it
+    # Vivid's theme storage path can vary. This is a common one.
+    _vivid_theme_file="$HOME/.config/vivid/themes/${_VIVID_THEME}.yml"
+    if [[ -f "$_vivid_theme_file" ]] || vivid list themes 2>/dev/null | grep -q "^${_VIVID_THEME}$"; then
+        export LS_COLORS="$(vivid generate "$_VIVID_THEME")"
+    else
+        echo "Vivid theme '$_VIVID_THEME' not found. Using Vivid's default." >&2
+        export LS_COLORS="$(vivid generate default 2>/dev/null || true)"
+    fi
+    unset _VIVID_THEME _vivid_theme_file
+elif [[ -x /usr/bin/dircolors ]]; then
+    [[ -r ~/.dircolors ]] && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
+fi
+
+# --- Colored Man Pages ---
+export LESS="-R"
+[[ -x /usr/bin/lesspipe ]] && eval "$(SHELL=/bin/sh lesspipe)"
+# Using defined palette for LESS_TERMCAP if possible (stripping \[ and \] for termcap)
+_strip_prompt_escapes() { echo "$1" | sed 's/\\\[//g; s/\\\]//g'; }
+export LESS_TERMCAP_mb="$(_strip_prompt_escapes "${CLR_BOLD}${CLR_ACCENT_ORANGE}")"
+export LESS_TERMCAP_md="$(_strip_prompt_escapes "${CLR_BOLD}${CLR_ACCENT_BLUE}")"
+export LESS_TERMCAP_me="$(_strip_prompt_escapes "${CLR_RESET}")"
+export LESS_TERMCAP_se="$(_strip_prompt_escapes "${CLR_RESET}")"
+export LESS_TERMCAP_so="$(_strip_prompt_escapes "${CLR_BOLD}")$(tput rev 2>/dev/null || echo '\033[7m')" # Standout (reverse video)
+export LESS_TERMCAP_ue="$(_strip_prompt_escapes "${CLR_RESET}")"
+export LESS_TERMCAP_us="$(_strip_prompt_escapes "${CLR_UNDERLINE}${CLR_ACCENT_GREEN}")"
+unset _strip_prompt_escapes
+
+
+#==========================================
+# PROMPT CONFIGURATION
+#==========================================
+# This section will primarily set up Starship. Fallback is minimal.
+
+_bashrc_set_terminal_title() {
+    case "$TERM" in
+        xterm*|rxvt*|screen*|tmux*)
+            echo -ne "\033]0;\${USER}@\${HOSTNAME}: \${PWD/#\$HOME/\~}\007" ;;
+    esac
+}
+
+# Initialize PROMPT_COMMAND with history append and title set.
+# Starship might take over or append to PROMPT_COMMAND.
+PROMPT_COMMAND="_bashrc_append_history; _bashrc_set_terminal_title"
+
+# --- Starship Prompt (Primary) ---
+# Needs starship installed: https://starship.rs/guide/#installation
+if command -v starship >/dev/null 2>&1; then
+    eval "$(starship init bash)"
+    # Starship should now handle the prompt and PROMPT_COMMAND modifications.
+    # If title isn't set by starship or you want to override:
+    # PROMPT_COMMAND=$(echo "$PROMPT_COMMAND" | sed "s/_bashrc_set_terminal_title//; s/;;/;/; s/^;//; s/;$//") # Remove our title setter
+    # then add starship's specific way or re-add ours if needed.
+    # For now, assume starship handles title or our previous setting is acceptable.
+else
+    # --- Fallback Prompt (If Starship is not installed) ---
+    _FALLBACK_CLR_RESET_RAW="\033[0m" # Raw for direct use in PS1
+    _FALLBACK_CLR_USER_RAW="\033[01;38;2;130;200;130m"
+    _FALLBACK_CLR_HOST_RAW="\033[01;38;2;120;180;255m"
+    _FALLBACK_CLR_PATH_RAW="\033[01;38;2;130;210;210m"
+    _FALLBACK_CLR_ERR_RAW="\033[01;38;2;255;100;100m"
+    _FALLBACK_CLR_VENV_RAW="\033[01;38;2;255;170;100m"
+
+    _build_fallback_prompt() {
+        local exit_status=$? ; PS1=""
+        if [[ -n "$VIRTUAL_ENV" ]]; then
+            PS1+="\[${_FALLBACK_CLR_VENV_RAW}\](venv:$(basename "$VIRTUAL_ENV"))\[${_FALLBACK_CLR_RESET_RAW}\] "
+        fi
+        PS1+="\[${_FALLBACK_CLR_USER_RAW}\]\u\[${_FALLBACK_CLR_RESET_RAW}\]@\[${_FALLBACK_CLR_HOST_RAW}\]\h\[${_FALLBACK_CLR_RESET_RAW}\]:\[${_FALLBACK_CLR_PATH_RAW}\]\w\[${_FALLBACK_CLR_RESET_RAW}\]"
+        PS1+="\n\$([[ $exit_status == 0 ]] && echo \"\" || echo \"\[${_FALLBACK_CLR_ERR_RAW}\]\")\\$ \[${_FALLBACK_CLR_RESET_RAW}\]"
+    }
+    PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND ; }_build_fallback_prompt"
+    # Fallback cleanup
+    unset _FALLBACK_CLR_RESET_RAW _FALLBACK_CLR_USER_RAW _FALLBACK_CLR_HOST_RAW _FALLBACK_CLR_PATH_RAW _FALLBACK_CLR_ERR_RAW _FALLBACK_CLR_VENV_RAW
+    unset _build_fallback_prompt # Clean up the function itself
+fi
+
+
+#==========================================
+# ALIASES & FUNCTIONS
+#==========================================
+# (Can be moved to ~/.bashrc.d/10-aliases.sh and 11-functions.sh)
+
+# --- Source External Aliases ---
+if [[ ! -f ~/.bash_aliases ]]; then
+    echo "# ~/.bash_aliases: Put your custom aliases here" > ~/.bash_aliases
+    echo "# Example: alias update='sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y'" >> ~/.bash_aliases
+    echo "Created ~/.bash_aliases. Please add your custom aliases there."
+fi
+# shellcheck source=/dev/null
+[[ -f ~/.bash_aliases ]] && . ~/.bash_aliases
+
+# --- Modern LS replacement (exa) ---
+if command -v exa >/dev/null 2>&1; then
+    alias ls='exa --icons --color=always --group-directories-first'
+    alias ll='exa -lgh --icons --color=always --group-directories-first --time-style=long-iso'
+    alias la='exa -lagh --icons --color=always --group-directories-first --time-style=long-iso'
+    alias l.='exa -Dlagh --icons --color=always --group-directories-first --time-style=long-iso'
+    alias lt='exa --tree --level=3 --icons --color=always --group-directories-first'
+else
+    alias ls='ls --color=auto -hF --group-directories-first'
+    alias ll='ls -la'
+    alias la='ls -A'
+    alias l.='ls -ld .?*'
+fi
+alias l='command ls -CF' # Use regular ls for simple column view if exa overrides 'ls'
+
+# --- Navigation Aliases ---
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias .....='cd ../../../..'
+alias cd..='cd ..'
+
+# --- Common Command Aliases ---
+alias h='history'
+alias c='clear'
+alias cls='clear'
+alias path='echo -e ${PATH//:/\\n}'
+alias ports='sudo netstat -tulnp 2>/dev/null || sudo ss -tulnp 2>/dev/null || echo "netstat/ss not found or permission denied"'
+alias myip="dig +short myip.opendns.com @resolver1.opendns.com || curl -s ifconfig.me || echo 'Could not fetch IP'"
+alias df='df -hT'
+alias du='du -sh'
+dus() { command du -sh "$@" | sort -rh ; }
+alias free='free -h'
+alias top='command -v htop >/dev/null 2>&1 && htop || command -v btop >/dev/null 2>&1 && btop || top'
+
+# --- Safety Aliases ---
+alias rm='rm -I --preserve-root'
+alias cp='cp -iv'
+alias mv='mv -iv'
+alias mkdir='mkdir -pv'
+
+# --- User Specific ---
+alias mac='~/dev_fproot/F5/mac_format.sh'
+
+# --- Utility Functions ---
+mkcd() {
+    if [[ -z "$1" ]]; then echo "Usage: mkcd <directory>" >&2; return 1; fi
+    if [[ ! -d "$1" ]]; then
+      if ! mkdir -p "$1"; then echo "Error: Could not create dir '$1'." >&2; return 1; fi
+    fi
+    if ! cd "$1"; then echo "Error: Could not cd to '$1'." >&2; return 1; fi
+}
+
+extract() {
+    local f="$1" r=""
+    if [[ -z "$f" ]]; then echo "Usage: extract <file>" >&2; return 1; fi
+    if [[ ! -f "$f" ]]; then echo "Error: '$f' not a file." >&2; return 1; fi
+    case "$f" in
+        *.tar.bz2|*.tbz2) r="tar"; tar xjf "$f" ;; *.tar.gz|*.tgz) r="tar"; tar xzf "$f" ;;
+        *.bz2) r="bunzip2"; bunzip2 "$f" ;; *.rar) r="unrar"; unrar x "$f" ;;
+        *.gz) r="gunzip"; gunzip "$f" ;;   *.tar) r="tar"; tar xf "$f" ;;
+        *.zip) r="unzip"; unzip "$f" ;;     *.Z) r="uncompress"; uncompress "$f" ;;
+        *.7z) r="7z"; 7z x "$f" ;;         *) echo "Error: cannot extract '$f'." >&2; return 1;;
+    esac
+    if ! command -v "$r" >/dev/null 2>&1; then echo "Error: tool '$r' for '$f' not found." >&2; return 1; fi
+    [[ $? -eq 0 ]] && echo "'$f' extracted." || { echo "Error extracting '$f'." >&2; return 1; }
+}
+
+is_port_open() {
+    if [[ $# -ne 2 ]]; then echo "Usage: is_port_open <host> <port>" >&2; return 1; fi
+    command -v nc >/dev/null || { echo "Error: nc not found." >&2; return 1; }
+    nc -zvw1 "$1" "$2" &>/dev/null && echo "Port $2 on $1 is OPEN" || echo "Port $2 on $1 is CLOSED"
+}
+
+serve() {
+    local p="${1:-8000}" ip
+    ip=$(hostname -I 2>/dev/null | awk '{print $1}') || ip="0.0.0.0"
+    echo "Serving $(pwd) on http://${ip}:${p} and http://0.0.0.0:${p}"
+    if command -v python3 >/dev/null; then python3 -m http.server "$p";
+    elif command -v python >/dev/null; then python -m SimpleHTTPServer "$p";
+    else echo "Error: Python not found." >&2; return 1; fi
+}
+
+#==========================================
+# FZF (Fuzzy Finder) Integration
+#==========================================
+# Needs fzf installed: https://github.com/junegunn/fzf#installation
+if command -v fzf >/dev/null 2>&1; then
+    _fzf_setup_paths=(
+        "/usr/share/doc/fzf/examples/key-bindings.bash"  # Debian/Ubuntu package
+        "/usr/share/fzf/key-bindings.bash" # Arch/Fedora
+        "/opt/homebrew/opt/fzf/shell/key-bindings.bash" # Homebrew macOS
+    )
+    if command -v brew >/dev/null 2>&1; then # Linuxbrew
+         _fzf_setup_paths+=("$(brew --prefix fzf 2>/dev/null)/shell/key-bindings.bash")
+    fi
+    _fzf_setup_paths+=("$HOME/.fzf.bash") # Manual install
+
+    for _fzf_path in "${_fzf_setup_paths[@]}"; do
+        if [[ -f "$_fzf_path" ]]; then
+            # shellcheck source=/dev/null
+            source "$_fzf_path"
+            break
+        fi
+    done
+    unset _fzf_path _fzf_setup_paths
+
+    # FZF styling (approximate with ANSI, fzf handles truecolor via specific options)
+    # These are examples, fine-tune with fzf --help and your terminal's capabilities
+    # export FZF_DEFAULT_OPTS="--color=fg:#D8DEE9,bg:#2E3440,hl:#88C0D0" # Nord-ish
+    # export FZF_DEFAULT_OPTS="$FZF_DEFAULT_OPTS --color=fg+:#ECEFF4,bg+:#3B4252,hl+:#81A1C1"
+    # export FZF_DEFAULT_OPTS="$FZF_DEFAULT_OPTS --color=info:#EBCB8B,prompt:#A3BE8C,spinner:#B48EAD,pointer:#BF616A,marker:#D08770"
+    # For your "Bearded Aquarelle Hydrangea" theme, you'd map your CLR_ vars to fzf's format.
+    # E.g. export FZF_DEFAULT_OPTS="--color=fg:252,bg:234,hl:66,fg+:254,bg+:235,hl+:103" (ANSI example)
+    # For truecolor, it's like --color 'hl:128,255,128' but syntax varies.
+    # Check fzf documentation for the latest color options.
+fi
+
+#==========================================
+# ZOXIDE (Smarter cd)
+#==========================================
+# Needs zoxide installed: https://github.com/ajeetdsouza/zoxide#installation
+if command -v zoxide >/dev/null 2>&1; then
+    eval "$(zoxide init bash --cmd cd)" # Use `cd` as the trigger
+    alias z='zoxide query -i' # Interactive selection with fzf
+    # `zi` is also a common alias for `zoxide query -i`
+fi
+
+#==========================================
+# ENVIRONMENT & PATH CONFIGURATION
+#==========================================
+export EDITOR="code --wait"
+export VISUAL="$EDITOR"
+export PAGER="less"
+# export GIT_EDITOR="$EDITOR"
+
+_add_to_path_start_if_exists() {
+    local d="$1"
+    [[ -d "$d" ]] && [[ ":$PATH:" != *":${d}:"* ]] && PATH="$d${PATH:+":$PATH"}"
+}
+_add_to_path_start_if_exists "$HOME/.local/bin"
+_add_to_path_start_if_exists "$HOME/bin"
+[[ -d "$HOME/go/bin" ]] && _add_to_path_start_if_exists "$HOME/go/bin"
+[[ -d "$HOME/.cargo/bin" ]] && _add_to_path_start_if_exists "$HOME/.cargo/bin"
+
+_CDPATH_SETUP="."
+[[ -d "$HOME/dev_fproot" ]] && _CDPATH_SETUP="$_CDPATH_SETUP:$HOME/dev_fproot"
+[[ -d "$HOME/projects" ]] && _CDPATH_SETUP="$_CDPATH_SETUP:$HOME/projects"
+[[ -d "$HOME/workspace" ]] && _CDPATH_SETUP="$_CDPATH_SETUP:$HOME/workspace"
+[[ -d "$HOME" ]] && _CDPATH_SETUP="$_CDPATH_SETUP:$HOME"
+export CDPATH="$_CDPATH_SETUP"
+
+# --- Git Specific Bash Completion (if not handled by global completion) ---
+if [[ -f /usr/share/bash-completion/completions/git ]]; then
+    # shellcheck source=/dev/null
+    . /usr/share/bash-completion/completions/git
+fi
+
+# --- Homebrew (Linuxbrew) ---
+_configure_homebrew() {
+    local brew_exe
+    if [[ -x "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then brew_exe="/home/linuxbrew/.linuxbrew/bin/brew";
+    elif [[ -x "/opt/homebrew/bin/brew" ]]; then brew_exe="/opt/homebrew/bin/brew";
+    elif command -v brew >/dev/null 2>&1; then brew_exe=$(command -v brew); fi
+    [[ -n "$brew_exe" ]] && eval "$("$brew_exe" shellenv)"
+}
+_configure_homebrew
+
+#==========================================
+# FINAL ACTIONS & CLEANUP
+#==========================================
+# Source modular files if you decide to split this up
+# _source_bashrc_d_files
+
+# Unset temporary variables and functions
+unset _source_bashrc_d_files _bashrc_append_history _bashrc_set_terminal_title
+unset _add_to_path_start_if_exists _CDPATH_SETUP _configure_homebrew
+# Unset color variables if they are only used for LESS_TERMCAP and not by prompt/other tools
+# If Starship is used, it won't need these CLR_ vars for the prompt itself.
+# However, other scripts or aliases might use them. For now, keep them exported.
+# Consider unsetting _FALLBACK_... variables if Starship is definitely installed and working.
+
+# --- END OF .bashrc ---
